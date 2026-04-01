@@ -3,13 +3,13 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api.provider import ProviderRequest
 from astrbot.api import logger
 import os
-import base64
+import shutil
 
 @register("astrbot_plugin_read_local_image", "User", "读取本地图片文件让 LLM 分析。", "1.0.0")
 class ReadLocalImagePlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
-        self._pending_images: dict[str, str] = {}  # uid -> data URI
+        self._pending_images: dict[str, str] = {}  # uid -> 临时文件路径
 
     @filter.llm_tool(name="read_local_image")
     async def read_local_image(self, event: AstrMessageEvent, file_path: str):
@@ -30,29 +30,35 @@ class ReadLocalImagePlugin(Star):
             return f"Error: 不是文件：{abs_path}"
 
         ext = os.path.splitext(abs_path)[1].lower()
-        supported = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.bmp': 'image/bmp', '.webp': 'image/webp'}
+        supported = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tif', '.tiff', '.svg', '.heic'}
         if ext not in supported:
-            return f"Error: 不支持的格式 {ext}，支持：{', '.join(supported.keys())}"
+            return f"Error: 不支持的格式 {ext}，支持：{', '.join(supported)}"
 
-        # 读取图片并转换为 data URI
-        with open(abs_path, "rb") as f:
-            image_data = f.read()
-        b64_str = base64.b64encode(image_data).decode('utf-8')
-        mime_type = supported[ext]
-        data_uri = f"data:{mime_type};base64,{b64_str}"
+        # 将图片复制到临时目录，注入文件路径
+        temp_dir = self._get_temp_dir()
+        temp_file = os.path.join(temp_dir, f"img_{os.path.basename(abs_path)}")
+        
+        try:
+            shutil.copy2(abs_path, temp_file)
+            self._pending_images[event.unified_msg_origin] = temp_file
+            logger.info(f"[ReadLocalImage] 图片已复制到临时目录：{temp_file}")
+            return "图片已读取"
+        except Exception as e:
+            return f"Error: 复制图片失败：{e}"
 
-        # 暂存 data URI，等 on_llm_request 注入
-        self._pending_images[event.unified_msg_origin] = data_uri
-        logger.info(f"[ReadLocalImage] 暂存图片 data URI (长度：{len(data_uri)})")
-        return "图片已读取"
+    def _get_temp_dir(self):
+        """获取临时目录，如果不存在则创建"""
+        temp_dir = os.path.join(os.path.expanduser("~"), ".astrbot", "plugin_temp", "read_local_image")
+        os.makedirs(temp_dir, exist_ok=True)
+        return temp_dir
 
     @filter.on_llm_request()
     async def inject_image_to_request(self, event: AstrMessageEvent, req: ProviderRequest):
-        """在 LLM 请求发出前，把暂存的图片注入到 req.image_urls"""
+        """在 LLM 请求发出前，把暂存的图片路径注入到 req.image_urls"""
         uid = event.unified_msg_origin
         if uid not in self._pending_images:
             return
 
-        data_uri = self._pending_images.pop(uid)
-        req.image_urls.append(data_uri)
-        logger.info(f"[ReadLocalImage] 注入 data URI 到 req.image_urls，当前数量：{len(req.image_urls)}")
+        path = self._pending_images.pop(uid)
+        req.image_urls.append(path)
+        logger.info(f"[ReadLocalImage] 注入文件路径：{path}")
