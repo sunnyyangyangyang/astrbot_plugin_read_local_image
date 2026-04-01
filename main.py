@@ -1,5 +1,6 @@
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
+from astrbot.api.provider import ProviderRequest
 from astrbot.api import logger
 import os
 
@@ -7,8 +8,7 @@ import os
 class ReadLocalImagePlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
-        # 用于暂存待注入的图片路径，key = unified_msg_origin
-        self._pending_images: dict[str, str] = {}
+        self._pending_images: dict[str, str] = {}  # uid -> 绝对路径
 
     @filter.llm_tool(name="read_local_image")
     async def read_local_image(self, event: AstrMessageEvent, file_path: str):
@@ -17,37 +17,38 @@ class ReadLocalImagePlugin(Star):
 
         Args:
             file_path (string): 图片文件的完整路径，例如 "screenshots/xxx.jpeg"
-        
+
         Returns:
-            操作结果提示
+            操作结果
         """
-        if not os.path.exists(file_path):
-            return f"Error: 文件不存在：{file_path}"
-        if not os.path.isfile(file_path):
-            return f"Error: 不是文件：{file_path}"
+        abs_path = os.path.abspath(file_path)
 
-        # 把路径暂存，等下一次 LLM 请求时注入
-        uid = event.unified_msg_origin
-        self._pending_images[uid] = os.path.abspath(file_path)
-        logger.info(f"[ReadLocalImage] 暂存图片路径: {file_path}")
-        return "图片已准备好，请直接描述你想对这张图片做什么分析。"
+        if not os.path.exists(abs_path):
+            return f"Error: 文件不存在：{abs_path}"
+        if not os.path.isfile(abs_path):
+            return f"Error: 不是文件：{abs_path}"
 
-    @filter.on_decorating_result()
-    async def inject_image(self, event: AstrMessageEvent):
-        """在 LLM 请求发出前，把暂存的图片路径注入进去"""
+        ext = os.path.splitext(abs_path)[1].lower()
+        supported = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'}
+        if ext not in supported:
+            return f"Error: 不支持的格式 {ext}，支持：{', '.join(supported)}"
+
+        # 暂存路径，等 on_llm_request 注入
+        self._pending_images[event.unified_msg_origin] = abs_path
+        logger.info(f"[ReadLocalImage] 暂存图片: {abs_path}")
+        return "图片已读取，请直接描述你想对这张图片做什么分析。"
+
+    @filter.on_llm_request()
+    async def inject_image_to_request(self, event: AstrMessageEvent, req: ProviderRequest):
+        """在 LLM 请求发出前，把暂存的图片路径注入到 req.image_urls"""
         uid = event.unified_msg_origin
         if uid not in self._pending_images:
             return
-        
+
         path = self._pending_images.pop(uid)
         if not os.path.exists(path):
             logger.warning(f"[ReadLocalImage] 注入时文件已不存在: {path}")
             return
-        
-        try:
-            # AstrBot 官方方式：直接把本地路径传给 image_urls
-            event.image_urls = getattr(event, 'image_urls', [])
-            event.image_urls.append(path)
-            logger.info(f"[ReadLocalImage] 注入成功: {path}")
-        except Exception as e:
-            logger.error(f"[ReadLocalImage] 注入失败: {e}")
+
+        req.image_urls.append(path)
+        logger.info(f"[ReadLocalImage] 注入成功: {path}, 当前 image_urls: {req.image_urls}")
