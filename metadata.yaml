@@ -1,6 +1,6 @@
-name: astrbot_plugin_image_url_base64_to_mcp
-display_name: Image Context Helper
-desc: 帮助 MCP 工具从上下文中获取图片 URL 或 Base64 数据。
-version: v1.1.5
-author: Thetail001
-repo: https://github.com/Thetail001/astrbot_plugin_image_url_base64_to_mcp
+name: astrbot_plugin_read_local_image
+display_name: Read Local Image
+desc: 读取本地图片文件并返回 Base64 数据。
+version: 1.0.0
+author: User
+repo: ""

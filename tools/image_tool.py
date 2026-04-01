@@ -1,83 +1,34 @@
-from astrbot.api import FunctionTool, logger
-from astrbot.api.event import AstrMessageEvent
-from astrbot.api.message_components import Image
-from astrbot.core.utils.io import download_image_by_url
-import json
 import base64
 import os
-import asyncio
 
-async def extract_images_from_event(event: AstrMessageEvent, look_back_limit: int = 5, prefer_base64: bool = False):
-    images = []
+async def read_image_as_base64(file_path: str):
+    """
+    读取本地图片文件并返回 Base64 编码数据。
     
-    if event.message_obj and event.message_obj.message:
-        for component in event.message_obj.message:
-            if isinstance(component, Image):
-                res = await _process_image(component, prefer_base64)
-                if res: images.append(res)
+    Args:
+        file_path (str): 图片文件的完整路径
     
-    if images: return images
-
+    Returns:
+        str: Base64 编码的图片数据，或错误信息
+    """
     try:
-        ctx = event.context
-        conv_mgr = ctx.conversation_manager
-        uid = event.unified_msg_origin
-        curr_cid = await conv_mgr.get_curr_conversation_id(uid)
-        conversation = await conv_mgr.get_conversation(uid, curr_cid)
+        if not os.path.exists(file_path):
+            return f"Error: 文件不存在：{file_path}"
         
-        if conversation and conversation.history:
-            history_list = json.loads(conversation.history)
-            count = 0
-            for msg in reversed(history_list):
-                if msg.get("role") == "user":
-                    content = msg.get("content")
-                    if isinstance(content, list):
-                        for part in content:
-                            if isinstance(part, dict) and part.get("type") == "image_url":
-                                img_url_obj = part.get("image_url", {})
-                                url = img_url_obj.get("url")
-                                if url:
-                                    res = await _process_url_string(url, force_download=prefer_base64)
-                                    if res: images.append(res)
-                    if images: break
-                    count += 1
-                    if count >= look_back_limit: break
+        if not os.path.isfile(file_path):
+            return f"Error: 文件是一个目录：{file_path}"
+        
+        # 检查文件扩展名
+        valid_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'}
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext not in valid_extensions:
+            return f"Error: 图片格式不支持：{ext} (支持：{', '.join(valid_extensions)})"
+        
+        with open(file_path, "rb") as f:
+            image_data = f.read()
+        
+        b64_str = base64.b64encode(image_data).decode('utf-8')
+        return b64_str
+        
     except Exception as e:
-        logger.error(f"[ImageTool] Error: {e}")
-    
-    return images
-
-async def _process_image(image_comp: Image, prefer_base64: bool = False):
-    # Fix: If we prefer URL (default) and valid URL exists, return it immediately.
-    if not prefer_base64 and image_comp.url and image_comp.url.startswith("http"):
-        return {"type": "url", "data": image_comp.url}
-
-    if image_comp.file and image_comp.file.startswith("base64://"):
-        return {"type": "base64", "data": image_comp.file[9:]}
-    
-    if image_comp.path and os.path.exists(image_comp.path):
-        try:
-            with open(image_comp.path, "rb") as f:
-                b64_str = base64.b64encode(f.read()).decode('utf-8')
-            return {"type": "base64", "data": b64_str}
-        except: pass
-    
-    return await _process_url_string(image_comp.url, force_download=prefer_base64)
-
-async def _process_url_string(url: str, force_download=False):
-    if not url: return None
-    if url.startswith("base64://"):
-        return {"type": "base64", "data": url[9:]}
-    if url.startswith("http"):
-        is_restricted = "api.telegram.org" in url or "localhost" in url or force_download
-        if is_restricted:
-            try:
-                file_path = await asyncio.wait_for(download_image_by_url(url), timeout=15.0)
-                if file_path and os.path.exists(file_path):
-                    with open(file_path, "rb") as f:
-                        b64_str = base64.b64encode(f.read()).decode('utf-8')
-                    return {"type": "base64", "data": b64_str}
-            except:
-                return {"type": "url", "data": url}
-        return {"type": "url", "data": url}
-    return {"type": "url", "data": url}
+        return f"Error: 读取图片失败：{str(e)}"
