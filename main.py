@@ -1,4 +1,4 @@
-from astrbot.api.event import filter
+from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from .tools.image_tool import read_image_as_base64
 
@@ -8,7 +8,7 @@ class ReadLocalImagePlugin(Star):
         super().__init__(context)
 
     @filter.llm_tool(name="read_local_image")
-    async def read_local_image(self, file_path: str):
+    async def read_local_image(self, event: AstrMessageEvent, file_path: str):
         """
         读取本地图片文件并返回 Base64 编码数据。
         
