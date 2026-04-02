@@ -1,6 +1,5 @@
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
-from astrbot.api.provider import ProviderRequest
 from astrbot.api import logger
 import base64
 from mcp.types import ImageContent, CallToolResult, TextContent
@@ -27,10 +26,7 @@ class ReadLocalImagePlugin(Star):
             self.enable_path_restriction = config.get("enable_path_restriction", True)
 
     def _check_path_allowed(self, file_path: str) -> bool:
-        """
-        使用 pathlib.Path.relative_to 检查路径是否在允许的目录列表中。
-        relative_to() 会在不是子路径时抛出 ValueError，比 is_relative_to() 更可靠。
-        """
+        """使用 pathlib.Path.is_relative_to 检查路径是否在允许的目录列表中。"""
         file_path_obj = Path(file_path).resolve()
         
         # 如果允许路径列表为空，允许所有路径
@@ -38,14 +34,8 @@ class ReadLocalImagePlugin(Star):
             return True
         
         for allowed_path in self.allowed_paths:
-            try:
-                # 使用 relative_to()，如果 file_path 是 allowed_path 的子路径则返回相对路径，否则抛出 ValueError
-                file_path_obj.relative_to(allowed_path)
+            if file_path_obj.is_relative_to(allowed_path):
                 return True
-            except ValueError:
-                # 不是该允许路径的子路径，继续检查下一个
-                continue
-        
         return False
 
     @filter.llm_tool(name="read_local_image")
@@ -71,12 +61,9 @@ class ReadLocalImagePlugin(Star):
         if not file_path_obj.is_file():
             return CallToolResult(content=[TextContent(type="text", text="Error: 不是文件")])
 
-        # 路径限制检查（使用安全的 is_relative_to/relative_to 方法）
-        if self.enable_path_restriction:
-            if self._check_path_allowed(file_path):
-                pass  # 允许访问
-            else:
-                return CallToolResult(content=[TextContent(type="text", text=f"Error: 路径限制，允许的路径：{[str(p) for p in self.allowed_paths]}]")])
+        # 路径限制检查
+        if self.enable_path_restriction and not self._check_path_allowed(file_path):
+            return CallToolResult(content=[TextContent(type="text", text=f"Error: 路径限制，允许的路径：{[str(p) for p in self.allowed_paths]}")])
 
         # 检查文件格式
         ext = file_path_obj.suffix.lower()
