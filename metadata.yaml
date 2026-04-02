@@ -3,4 +3,4 @@ display_name: Read Local Image
 desc: 读取本地图片文件并返回 Base64 数据。
 version: 1.0.0
 author: User
-repo: ""
+repo: "https://github.com/sunnyyangyangyang/astrbot_plugin_read_local_image"
