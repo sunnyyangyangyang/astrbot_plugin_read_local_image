@@ -6,7 +6,7 @@ import os
 import base64
 from mcp.types import ImageContent, CallToolResult, TextContent
 
-@register("astrbot_plugin_read_local_image", "User", "读取本地图片文件让 LLM 分析。", "1.0.0")
+@register("astrbot_plugin_read_local_image", "User", "读取本地图片文件并使用 ImageContent 机制让 LLM 立即分析图片内容。", "1.5.0")
 class ReadLocalImagePlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
