@@ -1,0 +1,20 @@
+{
+  "max_image_size": {
+    "type": "number",
+    "default": 5242880,
+    "name": "最大图片大小",
+    "description": "允许读取的最大图片文件大小（字节），默认 5242880（5MB）"
+  },
+  "allowed_paths": {
+    "type": "array",
+    "default": [],
+    "name": "允许访问的路径列表",
+    "description": "允许读取图片的目录路径列表，留空则使用相对路径。例如：[\"/home/user/images\", \"/var/www\"]"
+  },
+  "enable_path_restriction": {
+    "type": "boolean",
+    "default": true,
+    "name": "启用路径限制",
+    "description": "是否启用路径限制功能。启用后，只有 allowed_paths 中的路径才能被访问。"
+  }
+}
