@@ -28,7 +28,7 @@ class ReadLocalImagePlugin(Star):
     def _check_path_allowed(self, file_path: str) -> bool:
         """使用 pathlib.Path.is_relative_to 检查路径是否在允许的目录列表中。
         
-        采用"默认拒绝"策略：白名单为空时返回 False（允许所有路径）。
+        采用"默认拒绝"策略：白名单为空时返回 False（拒绝所有路径）。
         """
         file_path_obj = Path(file_path).resolve()
         
