@@ -1,6 +1,6 @@
 name: astrbot_plugin_read_local_image
 display_name: Read Local Image
-desc: 读取本地图片文件并使用 ImageContent 机制让 LLM 立即分析图片内容。
+desc: 读取本地图片文件并使用 ImageContent 机制让 LLM 立即分析图片内容
 version: 1.5.0
-author: User
+author: sunnyyang
 repo: "https://github.com/sunnyyangyangyang/astrbot_plugin_read_local_image"
