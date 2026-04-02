@@ -11,13 +11,16 @@ from pathlib import Path
 class ReadLocalImagePlugin(Star):
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
-        # 读取配置，使用默认值作为 fallback
-        self.max_image_size = 5 * 1024 * 1024  # 默认 5MB
+        # 读取配置，使用默认值作为 fallback（5MB）
+        self.max_image_size = 5 * 1024 * 1024
         self.allowed_paths: list[Path] = []
         self.enable_path_restriction = True
         
         if config:
-            self.max_image_size = config.get("max_image_size", 5 * 1024 * 1024)
+            # 配置单位为 MB，转换为字节
+            max_size_mb = config.get("max_image_size_mb", 5)
+            self.max_image_size = max_size_mb * 1024 * 1024
+            
             allowed_paths_str = config.get("allowed_paths", [])
             # 将允许的路径转换为 Path 对象并解析为绝对路径
             self.allowed_paths = [Path(p).resolve() for p in allowed_paths_str if p]

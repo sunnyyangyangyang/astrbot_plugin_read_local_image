@@ -1,9 +1,9 @@
 {
-  "max_image_size": {
+  "max_image_size_mb": {
     "type": "int",
-    "default": 5242880,
-    "name": "最大图片大小（字节）",
-    "description": "允许读取的最大图片文件大小（字节），默认 5242880（5MB）"
+    "default": 5,
+    "name": "最大图片大小（MB）",
+    "description": "允许读取的最大图片文件大小（MB），默认为 5MB。例如：设置为 10 表示 10MB。"
   },
   "allowed_paths": {
     "type": "list",
