@@ -26,10 +26,13 @@ class ReadLocalImagePlugin(Star):
             self.enable_path_restriction = config.get("enable_path_restriction", True)
 
     def _check_path_allowed(self, file_path: str) -> bool:
-        """使用 pathlib.Path.is_relative_to 检查路径是否在允许的目录列表中。"""
+        """使用 pathlib.Path.is_relative_to 检查路径是否在允许的目录列表中。
+        
+        白名单为空时返回 True（与 enable_path_restriction 配合实现开关效果）。
+        """
         file_path_obj = Path(file_path).resolve()
         
-        # 如果允许路径列表为空，允许所有路径
+        # 如果允许路径列表为空，返回 True（配合 enable_path_restriction 作为开关）
         if not self.allowed_paths:
             return True
         
@@ -78,14 +81,24 @@ class ReadLocalImagePlugin(Star):
         if ext not in mime_map:
             return CallToolResult(content=[TextContent(type="text", text=f"Error: 不支持的格式 {ext}")])
 
-        # 检查文件大小
-        file_size = file_path_obj.stat().st_size
+        # 获取文件大小（使用 try-except 处理权限错误）
+        try:
+            file_size = file_path_obj.stat().st_size
+        except PermissionError:
+            return CallToolResult(content=[TextContent(type="text", text="Error: 读取文件大小需要权限")])
+        
         if file_size > self.max_image_size:
             return CallToolResult(content=[TextContent(type="text", text=f"Error: 文件大小超过 {self.max_image_size // (1024*1024)}MB 限制 (当前：{file_size} bytes)")])
 
-        # 读取图片数据
-        with open(file_path_obj, "rb") as f:
-            image_data = f.read()
+        # 读取图片数据（使用 try-except 处理各种 IO 错误）
+        try:
+            with open(file_path_obj, "rb") as f:
+                image_data = f.read()
+        except PermissionError:
+            return CallToolResult(content=[TextContent(type="text", text="Error: 读取图片需要权限")])
+        except IOError as e:
+            return CallToolResult(content=[TextContent(type="text", text=f"Error: 读取图片失败：{e!s}")])
+        
         b64_str = base64.b64encode(image_data).decode('utf-8')
         mime_type = mime_map[ext]
 
@@ -98,6 +111,6 @@ class ReadLocalImagePlugin(Star):
                     type="image",
                     data=b64_str,
                     mimeType=mime_type
-                )
+        )
             ]
         )
