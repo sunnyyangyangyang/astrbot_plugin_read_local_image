@@ -6,7 +6,7 @@ import os
 import base64
 from mcp.types import ImageContent, CallToolResult, TextContent
 
-@register("astrbot_plugin_read_local_image", "User", "读取本地图片文件并使用 ImageContent 机制让 LLM 立即分析图片内容。", "1.5.0")
+@register("astrbot_plugin_read_local_image", "sunnyyang", "读取本地图片文件并使用 ImageContent 机制让 LLM 立即分析图片内容", "1.5.0")
 class ReadLocalImagePlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -25,9 +25,9 @@ class ReadLocalImagePlugin(Star):
         abs_path = os.path.abspath(file_path)
 
         if not os.path.exists(abs_path):
-            return "Error: 文件不存在"
+            return CallToolResult(content=[TextContent(type="text", text="Error: 文件不存在")])
         if not os.path.isfile(abs_path):
-            return "Error: 不是文件"
+            return CallToolResult(content=[TextContent(type="text", text="Error: 不是文件")])
 
         ext = os.path.splitext(abs_path)[1].lower()
         mime_map = {
@@ -39,7 +39,13 @@ class ReadLocalImagePlugin(Star):
             '.webp': 'image/webp'
         }
         if ext not in mime_map:
-            return f"Error: 不支持的格式 {ext}"
+            return CallToolResult(content=[TextContent(type="text", text=f"Error: 不支持的格式 {ext}")])
+
+        # 检查文件大小（限制为 5MB）
+        max_size = 5 * 1024 * 1024  # 5MB
+        file_size = os.path.getsize(abs_path)
+        if file_size > max_size:
+            return CallToolResult(content=[TextContent(type="text", text=f"Error: 文件大小超过 5MB 限制 (当前：{file_size} bytes)")])
 
         with open(abs_path, "rb") as f:
             image_data = f.read()
